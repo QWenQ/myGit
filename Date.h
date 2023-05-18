@@ -25,7 +25,8 @@ class Date {
 
         std::string toString() const {
             char ret[50];
-            std::strftime(ret, sizeof ret, "%c %z", std::localtime(&m_t));
+            // std::strftime(ret, sizeof ret, "%c %z", std::localtime(&m_t));
+            std::strftime(ret, sizeof ret, "%a %b %m %T %Y %z", std::localtime(&m_t));
             return ret;
         }
     private:

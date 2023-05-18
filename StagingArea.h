@@ -16,8 +16,8 @@ class StagingArea {
         bool containsInRemoval(const std::string& filename) const;
         std::string getFileRefInAddition(const std::string& filename) const;
         bool containsInAddition(const std::string& filename) const;
-        std::unordered_map<std::string, std::string>& getAddition() const;
-        std::unordered_map<std::string, std::string>& getRemoval() const;
+        std::unordered_map<std::string, std::string>& getAddition();
+        std::unordered_map<std::string, std::string>& getRemoval();
         void addToAddition(const Blob& blob);
         void removeFromAddition(const Blob& blob);
         void removeFromAddition(const std::string& filename);

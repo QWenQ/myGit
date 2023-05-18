@@ -44,11 +44,11 @@ void checkAndRun(int argc, char* argv[]) {
         else message("Incorrect operands.");
     }
     else if (std::strcmp(argv[1], "rm") == 0) {
-        if (argc != 2) {
+        if (argc != 3) {
             message("Incorrect operands.");
             std::exit(0);
         }
-        Repository::rm(argv[1]);
+        Repository::rm(argv[2]);
     }
     else if (std::strcmp(argv[1], "log") == 0) {
         if (argc != 2) {

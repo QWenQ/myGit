@@ -7,6 +7,9 @@ std::string Tree::getHeadRef() const {
 }
 
 void Tree::addNewBranch(const std::string& branch_name, const Commit& branch_head) {
+    if (m_branches.find(branch_name) != m_branches.end()) {
+        m_branches.erase(branch_name);
+    }
     m_branches.emplace(branch_name, branch_head.getCommitRef());
 }
 
@@ -19,11 +22,14 @@ void Tree::updateBranchHead(const std::string& branch_name, const Commit& branch
         updateHead(branch_head.getCommitRef());
     }
     else {
+        if (m_branches.find(branch_name) != m_branches.end()) {
+            m_branches.erase(branch_name);
+        }
         m_branches.emplace(branch_name, branch_head.getCommitRef());
     }
 }
 
-Commit Tree::getGivenBranchHead(std::string& branch_name) const {
+Commit Tree::getGivenBranchHead(const std::string& branch_name) const {
     std::string commit_ref = m_branches.at(branch_name);
     Commit commit = Commit();
     commit.setCommitRef(commit_ref);
@@ -32,6 +38,9 @@ Commit Tree::getGivenBranchHead(std::string& branch_name) const {
 }
 
 void Tree::updateHead(const std::string& commit_ref) {
+    if (m_branches.find(m_active_branch) != m_branches.end()) {
+        m_branches.erase(m_active_branch);
+    }
     m_branches.emplace(m_active_branch, commit_ref);
     m_head = commit_ref;
 }
@@ -42,6 +51,9 @@ void Tree::removeBranch(const std::string& branch_name) {
 }
 
 void Tree::addNewBranch(const std::string& branch_name) {
+    if (m_branches.find(branch_name) != m_branches.end()) {
+        m_branches.erase(branch_name);
+    }
     m_branches.emplace(branch_name, m_head);
 }
 
@@ -66,8 +78,14 @@ void Tree::setActiveBranch(const std::string& branch_name) {
 
 void Tree::add(Commit& commit) {
     commit.setParentRef(m_head);
+    if (m_branches.find(m_active_branch) != m_branches.end()) {
+        m_branches.erase(m_active_branch);
+    }
+    if (m_branches.size() == 0) {
+        m_active_branch = "master";
+    }
     m_branches.emplace(m_active_branch, commit.getCommitRef());
-    m_head = commit.getParentRef();
+    m_head = commit.getCommitRef();
 }
 
 Commit Tree::getHead() const {

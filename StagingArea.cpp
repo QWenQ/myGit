@@ -34,15 +34,18 @@ bool StagingArea::containsInAddition(const std::string& filename) const {
     return m_addition.find(filename) != m_addition.end();
 }
 
-std::unordered_map<std::string, std::string>& StagingArea::getAddition() const {
+std::unordered_map<std::string, std::string>& StagingArea::getAddition() {
     return m_addition;
 }
 
-std::unordered_map<std::string, std::string>& StagingArea::getRemoval() const {
+std::unordered_map<std::string, std::string>& StagingArea::getRemoval() {
     return m_removal;
 }
 
 void StagingArea::addToAddition(const Blob& blob) {
+    if (m_addition.find(blob.getFilename()) != m_addition.end()) {
+        m_addition.erase(blob.getFilename());
+    }
     m_addition.emplace(blob.getFilename(), blob.getFileRef());
 }
 
@@ -56,6 +59,9 @@ void StagingArea::removeFromAddition(const std::string& filename) {
 }
 
 void StagingArea::addToRemoval(const Blob& blob) {
+    if (m_removal.find(blob.getFilename()) != m_removal.end()) {
+        m_removal.erase(blob.getFilename());
+    }
     m_removal.emplace(blob.getFilename(), blob.getFileRef());
 }
 

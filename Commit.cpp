@@ -64,6 +64,9 @@ void Commit::setSecondParentRef(const std::string& second_parent_ref) {
 }
 
 void Commit::setBlobRef(const std::string& filename, const std::string& commit_ref) {
+    if (m_map.find(filename) != m_map.end()) {
+        m_map.erase(filename);
+    }
     m_map.emplace(filename, commit_ref);
 }
 
@@ -113,6 +116,9 @@ void Commit::updateMessage(const std::string& message) {
 }
 
 void Commit::addFileReference(const std::string& filename, const std::string& commit_ref) {
+    if (m_map.find(filename) != m_map.end()) {
+        m_map.erase(filename);
+    }
     m_map.emplace(filename, commit_ref);
 }
 
@@ -166,11 +172,11 @@ bool Commit::readFromFile() {
 
     // in case the commit reference is a short ref
     std::string commit_file_short = m_commit_ref.substr(2);
-    std::list<fs::path> regular_files = plainFilenamesIn(commit_parent_dir);
+    std::set<std::string> regular_files = plainFilenamesIn(commit_parent_dir);
     for (const auto& it : regular_files) {
         // if get the target file, quit the loop
-        if (commit_file_short == it.string().substr(0, commit_file_short.size())) {
-            commit_file_short = it.string();
+        if (commit_file_short == it.substr(0, commit_file_short.size())) {
+            commit_file_short = it;
             break;
         }
     }

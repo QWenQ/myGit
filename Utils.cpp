@@ -36,7 +36,8 @@ std::string readContent(const fs::path& filename) {
 
 void writeContents(const std::string& file_name, std::initializer_list<std::string> lst) {
     try {
-        std::ofstream out_file(file_name, std::ios_base::app);
+        // std::ofstream out_file(file_name, std::ios_base::app);
+        std::ofstream out_file(file_name);
         for (auto it = lst.begin(); it != lst.end(); ++it) {
             out_file.write((*it).c_str(), (*it).size());
         }
@@ -49,7 +50,8 @@ void writeContents(const std::string& file_name, std::initializer_list<std::stri
 
 void writeContents(const fs::path& filename, std::initializer_list<std::string> lst) {
     try {
-        std::ofstream out_file(filename, std::ios_base::app);
+        // std::ofstream out_file(filename, std::ios_base::app);
+        std::ofstream out_file(filename);
         for (auto it = lst.begin(); it != lst.end(); ++it) {
             out_file.write((*it).c_str(), (*it).size());
         }
@@ -65,8 +67,11 @@ std::set<std::string> plainFilenamesIn(const fs::path& dir_name) {
     try {
         std::set<std::string> myset;
         for (const auto& entry : std::filesystem::directory_iterator(dir_name)) {
-            if (std::filesystem::is_regular_file(entry.path())) {
-                myset.emplace(entry.path().filename().string());
+            if (fs::is_regular_file(entry.path())) {
+                std::string file_name = entry.path().filename().string();
+                if (file_name != "gitlet") {
+                    myset.emplace(file_name);
+                }
             }
         }
         return myset;

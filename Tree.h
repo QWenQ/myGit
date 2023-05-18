@@ -15,7 +15,7 @@ class Tree {
         void addNewBranch(const std::string& branch_name, const Commit& branch_head);
         void setActiveBranchToNULL();
         void updateBranchHead(const std::string& branch_name, const Commit& branch_head);
-        Commit getGivenBranchHead(std::string& branch_name) const;
+        Commit getGivenBranchHead(const std::string& branch_name) const;
         void updateHead(const std::string& commit_ref);
         void removeBranch(const std::string& branch_name);
         void addNewBranch(const std::string& branch_name);

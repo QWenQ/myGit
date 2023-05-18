@@ -10,6 +10,7 @@ from math import log
 # Debug
 import subprocess
 import os
+import pdb
 
 SHORT_USAGE = """\
 Usage: python3 tester.py OPTIONS TEST.in ...
@@ -238,6 +239,8 @@ def correctFileOutput(name, expected, dir):
     return userData == stdData
 
 def correctProgramOutput(expected, actual, last_groups, is_regexp):
+    # Debug
+    # breakpoint()
     expected = re.sub(r'[ \t]+\n', '\n', '\n'.join(expected))
     expected = re.sub(r'(?m)^[ \t]+', ' ', expected)
     actual = re.sub(r'[ \t]+\n', '\n', actual)
@@ -323,6 +326,8 @@ def doTest(test):
 
     def subst_var(M):
         key = M.group(1)
+        # Debug
+        # breakpoint()
         if Match(r'\d+$', key):
             try:
                 return last_groups[int(key)]
@@ -404,6 +409,9 @@ def doTest(test):
                     if out:
                         print(re.sub(r'(?m)^', '- ', chop_nl(out)))
                 if msg == "OK":
+                    #Debug
+                    #print("Debug::deTest()::expected:", expected)
+                    #print("Debug::deTest()::out     :", out)
                     if not correctProgramOutput(expected, out, last_groups,
                                                 is_regexp):
                         msg = "incorrect output"
@@ -429,6 +437,8 @@ def doTest(test):
                     reportDetails(test, included_files, line_num)
                     return False
             elif Match(r'(?s)D\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*"(.*)"\s*$', line):
+                # Debug
+                # breakpoint()
                 defns[Group(1)] = Group(2)
             else:
                 raise ValueError("bad test line at {}".format(line_num))
@@ -491,7 +501,6 @@ if __name__ == "__main__":
             k = 10
             while k > 0 and access(prog_dir, W_OK):
                 k -= 1
-                # if exists(join(prog_dir, 'gitlet', 'Main.class')):
                 if exists(join(prog_dir, 'gitlet')):
                     break
                 prog_dir = dirname(prog_dir)

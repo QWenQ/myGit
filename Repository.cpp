@@ -1,6 +1,7 @@
 #include <iostream>
 #include <list>
 #include <vector>
+#include <queue>
 #include <algorithm>
 
 #include "Repository.h"
@@ -202,7 +203,8 @@ void Repository::rm(const std::string& file_name) {
     staging_area.readFromFile();
 
     Commit head = tree.getHead();
-    if (staging_area.containsInAddition(file_name) == false && head.containFile(file_name) == false) {
+    if (staging_area.containsInAddition(file_name) == false 
+    && head.containFile(file_name) == false) {
         message("No reason to remove the file.");
         return;
     }
@@ -254,7 +256,12 @@ void Repository::log() {
 }
 
 void Repository::globalLog() {
-    std::set<std::string> commit_dirs = plainFilenamesIn(COMMIT_DIR);
+    std::set<std::string> commit_dirs;
+    for (const auto& entry : std::filesystem::directory_iterator(COMMIT_DIR)) {
+        commit_dirs.emplace(entry.path().filename().string());
+    }
+
+    // std::set<std::string> commit_dirs = plainFilenamesIn(COMMIT_DIR);
     for (const auto& commit_dir : commit_dirs) {
         std::set<std::string> commit_files = plainFilenamesIn(commit_dir);
         for (const auto& commit_file : commit_files) {
@@ -407,19 +414,317 @@ void Repository::status() {
 }
 
 void Repository::branch(const std::string& branch_name) {
-    // todo
+    tree.readFromFile();
+    if (tree.isBranchExist(branch_name)) {
+        message("A branch with that name already exists.");
+        return;
+    }
+    tree.addNewBranch(branch_name);
+    tree.writeToFile();
 }
 
 void Repository::rmBranch(const std::string& branch_name) {
-    // todo
+    tree.readFromFile();
+    if (tree.isBranchExist(branch_name) == false) {
+        message("A branch with that name does not exist.");
+        return;
+    }
+    if (branch_name == tree.getActiveBranch()) {
+        message("Cannot remove the current branch.");
+        return;
+    }
+    tree.removeBranch(branch_name);
+    tree.writeToFile();
 }
 
 void Repository::reset(const std::string& commit_ref) {
-    // todo
+    Commit target_commit = Commit();
+    target_commit.setCommitRef(commit_ref);
+    if (target_commit.readFromFile() == false) {
+        message("No commit with that id exists.");
+        return;
+    }
+    tree.readFromFile();
+    std::string active_branch = tree.getActiveBranch();
+    tree.addNewBranch(active_branch, target_commit);
+    tree.setActiveBranchToNULL();
+    tree.writeToFile();
+
+    Repository::checkout(active_branch);
+
+}
+
+static std::string getTheSplitPoint(const Commit& current_head, const Commit& given_head) {
+    std::set<std::string> parents_of_current_head;
+    std::queue<Commit> fringe;
+    while (fringe.empty() == false) {
+        Commit commit = fringe.front();
+        fringe.pop();
+        parents_of_current_head.emplace(commit.getCommitRef());
+        if (commit.getParentRef() != "") {
+            Commit first_parent = Commit();
+            first_parent.setCommitRef(commit.getParentRef());
+            first_parent.readFromFile();
+            fringe.push(first_parent);
+        }
+        
+        if (commit.getSecondParentRef() != "") {
+            Commit second_parent = Commit();
+            second_parent.setCommitRef(commit.getSecondParentRef());
+            second_parent.readFromFile();
+            fringe.push(second_parent);
+        }
+    }
+
+
+    if (parents_of_current_head.find(given_head.getCommitRef()) != parents_of_current_head.end()) {
+        return "false";
+    }
+
+    fringe.push(given_head);
+    while (fringe.empty() == false) {
+        Commit commit = fringe.front();
+        fringe.pop();
+        if (parents_of_current_head.find(commit.getCommitRef()) != parents_of_current_head.end()) {
+            return commit.getCommitRef();
+        }
+
+        if (commit.getParentRef() != "") {
+            Commit first_parent = Commit();
+            first_parent.setCommitRef(commit.getParentRef());
+            first_parent.readFromFile();
+            fringe.push(first_parent);
+        }
+        
+        if (commit.getSecondParentRef() != "") {
+            Commit second_parent = Commit();
+            second_parent.setCommitRef(commit.getSecondParentRef());
+            second_parent.readFromFile();
+            fringe.push(second_parent);
+        }
+    }
+    return "";
 }
 
 void Repository::merge(const std::string& branch_name) {
     // todo
+    staging_area.readFromFile();
+    if (staging_area.isEmpty() == false) {
+        message("You have uncommitted changes.");
+        return;
+    }
+
+    tree.readFromFile();
+    if (tree.isBranchExist(branch_name) == false) {
+        message("A branch with that name does not exist.");
+        return;
+    }
+
+    if (branch_name == tree.getActiveBranch()) {
+        message("Cannot merge a branch with itself.");
+        return;
+    }
+
+    Commit current_head = tree.getHead();
+    Commit given_branch_head = tree.getGivenBranchHead(branch_name);
+
+    /* If an untracked file in the current commit would be overwritten or deleted by the merge */
+    std::set<std::string> files_in_cwd = plainFilenamesIn(CWD);
+    for (const auto& file : files_in_cwd) {
+        Blob blob = Blob();
+        blob.readFromOriginalFile(file);
+        if (staging_area.containsBlob(blob) == false && current_head.containsBlob(blob) == false) {
+            if (current_head.containFile(file) || given_branch_head.containFile(file)) {
+                message("There is an untracked file in the way; delete it, or add and commit it first.");
+                return;
+            }
+        }
+    }
+
+    std::string split_point_ref = getTheSplitPoint(current_head, given_branch_head);
+    if (split_point_ref == "false") {
+        message("Given branch is an ancestor of the current branch.");
+        return;
+    }
+    else if (split_point_ref == current_head.getCommitRef()) {
+        Repository::checkout(branch_name);
+        message("Current branch fast-forwarded.");
+    }
+
+    Commit split_point = Commit();
+    split_point.setCommitRef(split_point_ref);
+    split_point.readFromFile();
+
+    Commit merged_commit = tree.getHead();
+
+    /* Any files that have been modified in the given branch since the split
+    point, but not modified in the current branch since the split point should
+    be changed to their versions in the given branch. */
+    for (const auto& it : current_head.getFilesMap()) {
+        if (split_point.containFile(it.first, it.second)) {
+            if (given_branch_head.containFile(it.first) && given_branch_head.containFile(it.first, it.second) == false) {
+                merged_commit.setBlobRef(it.first, given_branch_head.getBlobRef(it.first));
+                Repository::checkout(given_branch_head.getCommitRef(), "--", it.first);
+            }
+        }
+    }
+
+
+    /* Any files that were not present at the split point and are present only
+    in the given branch should be checked out and staged. */
+    for (const auto& it : given_branch_head.getFilesMap()) {
+        if (split_point.containFile(it.first, it.second) == false && current_head.containFile(it.first, it.second) == false) {
+            Repository::checkout(given_branch_head.getCommitRef(), "--", it.first);
+            merged_commit.addFileReference(it.first, it.second);
+        }
+    }
+
+    /* Any files present at the split point, unmodified in the current branch,
+    and absent in the given branch should be removed (and untracked). */
+    for (const auto& it : split_point.getFilesMap()) {
+        if (current_head.containFile(it.first, it.second) && given_branch_head.containFile(it.first) == false) {
+            merged_commit.removeFileReference(it.first, it.second);
+            fs::remove(it.first);
+        }
+    }
+
+
+    /* Any files modified in different ways in the current and given branches are in conflict.*/
+    bool is_conflict = false;
+    /* Modified in different ways: */
+    /* the contents of both are changed and different from other */
+    for (const auto& it : split_point.getFilesMap()) {
+        if (current_head.containFile(it.first) && given_branch_head.containFile(it.first)) {
+            std::string blob_ref_in_curr_head = current_head.getBlobRef(it.first);
+            std::string blob_ref_in_given_head = given_branch_head.getBlobRef(it.first);
+            if (it.second != blob_ref_in_curr_head && it.second != blob_ref_in_given_head && blob_ref_in_curr_head != blob_ref_in_given_head) {
+                is_conflict = true;
+                Blob blob_in_current_head = Blob();
+                blob_in_current_head.setFileRef(blob_ref_in_curr_head);
+                blob_in_current_head.readFromBlobFile();
+
+                Blob blob_in_given_head = Blob();
+                blob_in_given_head.setFileRef(blob_ref_in_given_head);
+                blob_in_given_head.readFromBlobFile();
+
+                std::string content = "<<<<<<< HEAD\n"
+                            + blob_in_current_head.getContent()
+                            + "=======\n"
+                            + blob_in_given_head.getContent()
+                            + ">>>>>>>\n";
+                
+                Blob blob = Blob();
+                blob.setFilename(it.first);
+                blob.setContent(content);
+                blob.update();
+                blob.writeToBlobFile();
+                blob.writeToOriginalFile();
+
+                merged_commit.setBlobRef(it.first, blob.getFileRef());
+            }
+        }
+    }
+
+    /* the contents of one are changed and the other file is deleted */
+    for (const auto& it : split_point.getFilesMap()) {
+        std::string blob_ref_in_curr_head = current_head.getBlobRef(it.first);
+        std::string blob_ref_in_given_head = given_branch_head.getBlobRef(it.first);
+        if (current_head.containFile(it.first) && given_branch_head.containFile(it.first) == false) {
+            if (it.second != blob_ref_in_curr_head) {
+                is_conflict = true;
+                Blob blob_in_current_head = Blob();
+                blob_in_current_head.setFileRef(blob_ref_in_curr_head);
+                blob_in_current_head.readFromBlobFile();
+
+                std::string content = "<<<<<<< HEAD\n"
+                            + blob_in_current_head.getContent()
+                            + "=======\n"
+                            + ">>>>>>>\n";
+                
+                Blob blob = Blob();
+                blob.setFilename(it.first);
+                blob.setContent(content);
+                blob.update();
+                blob.writeToBlobFile();
+                blob.writeToOriginalFile();
+
+                merged_commit.setBlobRef(it.first, blob.getFileRef());
+            }
+        }
+        else if (current_head.containFile(it.first) == false && given_branch_head.containFile(it.first)) {
+            if (it.second != blob_ref_in_given_head) {
+                is_conflict = true;
+
+                Blob blob_in_given_head = Blob();
+                blob_in_given_head.setFileRef(blob_ref_in_given_head);
+                blob_in_given_head.readFromBlobFile();
+
+                std::string content = "<<<<<<< HEAD\n=======\n"
+                            + blob_in_given_head.getContent()
+                            + ">>>>>>>\n";
+                
+                Blob blob = Blob();
+                blob.setFilename(it.first);
+                blob.setContent(content);
+                blob.update();
+                blob.writeToBlobFile();
+                blob.writeToOriginalFile();
+
+                merged_commit.setBlobRef(it.first, blob.getFileRef());
+            }
+
+        }
+    }
+
+
+    /* the file was absent at the split point and has different contents in the given and current branches */
+    for (const auto& it : current_head.getFilesMap()) {
+        if (split_point.containFile(it.first) == false && given_branch_head.containFile(it.first)) {
+            std::string blob_ref_in_given_head = given_branch_head.getBlobRef(it.first);
+            if (blob_ref_in_given_head != it.second) {
+                is_conflict = true;
+                Blob blob_in_current_head = Blob();
+                blob_in_current_head.setFileRef(it.second);
+                blob_in_current_head.readFromBlobFile();
+
+                Blob blob_in_given_head = Blob();
+                blob_in_given_head.setFileRef(blob_ref_in_given_head);
+                blob_in_given_head.readFromBlobFile();
+
+                std::string content = "<<<<<<< HEAD\n"
+                            + blob_in_current_head.getContent()
+                            + "=======\n"
+                            + blob_in_given_head.getContent()
+                            + ">>>>>>>\n";
+                
+                Blob blob = Blob();
+                blob.setFilename(it.first);
+                blob.setContent(content);
+                blob.update();
+                blob.writeToBlobFile();
+                blob.writeToOriginalFile();
+
+                merged_commit.setBlobRef(it.first, blob.getFileRef());
+
+            }
+        }
+    }
+
+    /* if encoutner a merge conflict */
+    if (is_conflict) message("Encountered a merge conflict.");
+
+    merged_commit.setParentRef(current_head.getCommitRef());
+    merged_commit.setSecondParentRef(given_branch_head.getCommitRef());
+    std::string log_message = "Merged " + branch_name + " into " + tree.getActiveBranch() + ".";
+    merged_commit.setLogMessage(log_message);
+    merged_commit.updateRef();
+
+    tree.add(merged_commit);
+
+    // persistence
+    merged_commit.writeToFile();
+    staging_area.writeToFile();
+    tree.writeToFile();
 }
 
 void Repository::addRemote(const std::string& remote_name, const std::string& remote_repo) {
