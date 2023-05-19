@@ -257,16 +257,17 @@ void Repository::log() {
 
 void Repository::globalLog() {
     std::set<std::string> commit_dirs;
-    for (const auto& entry : std::filesystem::directory_iterator(COMMIT_DIR)) {
-        commit_dirs.emplace(entry.path().filename().string());
+    for (const auto& entry : fs::directory_iterator(COMMIT_DIR)) {
+        commit_dirs.emplace(entry.path().string());
     }
 
-    // std::set<std::string> commit_dirs = plainFilenamesIn(COMMIT_DIR);
     for (const auto& commit_dir : commit_dirs) {
         std::set<std::string> commit_files = plainFilenamesIn(commit_dir);
+        fs::path pa = commit_dir;
+        std::string dir_name = pa.filename().string();
         for (const auto& commit_file : commit_files) {
             Commit commit = Commit();
-            commit.setCommitRef(commit_dir + commit_file);
+            commit.setCommitRef(dir_name + commit_file);
             commit.readFromFile();
             message("===");
             message("commit " + commit.getCommitRef());
@@ -278,19 +279,24 @@ void Repository::globalLog() {
             }
             message("Date: " + commit.getDate());
             message(commit.getMessage());
-            message("");
+            std::cout << std::endl;
         }
     }
 }
 
 void Repository::find(const std::string& commit_message) {
     bool find_commit = false;
-    std::set<std::string> commit_dirs = plainFilenamesIn(COMMIT_DIR);
+    std::set<std::string> commit_dirs;
+    for (const auto& entry : fs::directory_iterator(COMMIT_DIR)) {
+        commit_dirs.emplace(entry.path().string());
+    }
     for (const auto& commit_dir : commit_dirs) {
         std::set<std::string> commit_files = plainFilenamesIn(commit_dir);
+        fs::path pa = commit_dir;
+        std::string dir_name = pa.filename().string();
         for (const auto& commit_file : commit_files) {
             Commit commit = Commit();
-            commit.setCommitRef(commit_dir + commit_file);
+            commit.setCommitRef(dir_name + commit_file);
             commit.readFromFile();
             if (commit_message == commit.getMessage()) {
                 find_commit = true;
@@ -298,6 +304,7 @@ void Repository::find(const std::string& commit_message) {
             }
         }
     }
+    std::cout << std::endl;
     if (find_commit == false) {
         message("Found no commit with that message.");
     }
@@ -306,6 +313,10 @@ void Repository::find(const std::string& commit_message) {
 void Repository::status() {
     tree.readFromFile();
     staging_area.readFromFile();
+    if (tree.getActiveBranch() == "") {
+        message("Not in an initialized Gitlet directory.");
+        return;
+    }
 
     /* Entries should be listed in lexicographic order, * using the Java string-comparison order (the asterisk doesn’t count). */
     message("=== Branches ===");
@@ -457,7 +468,8 @@ void Repository::reset(const std::string& commit_ref) {
 static std::string getTheSplitPoint(const Commit& current_head, const Commit& given_head) {
     std::set<std::string> parents_of_current_head;
     std::queue<Commit> fringe;
-    while (fringe.empty() == false) {
+    fringe.push(current_head);
+    while (!fringe.empty()) {
         Commit commit = fringe.front();
         fringe.pop();
         parents_of_current_head.emplace(commit.getCommitRef());
@@ -474,6 +486,7 @@ static std::string getTheSplitPoint(const Commit& current_head, const Commit& gi
             second_parent.readFromFile();
             fringe.push(second_parent);
         }
+        parents_of_current_head.emplace(commit.getCommitRef());
     }
 
 

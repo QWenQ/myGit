@@ -15,7 +15,7 @@ PartA: main.o Blob.o Commit.o RemoteRepo.o Repository.o StagingArea.o Tree.o Uti
 
 gitlet: main.o Blob.o Commit.o RemoteRepo.o Repository.o StagingArea.o Tree.o Utils.o
 	$(CC) $(LDFLAGS) -o gitlet main.o Blob.o Commit.o RemoteRepo.o Repository.o StagingArea.o Tree.o Utils.o $(BOOSTFLAGS)
-
+	# rm -rf *.o
 %.o: %.cpp
 	$(CC) $(CFLAGS) $< $(BOOSTFLAGS)
 
