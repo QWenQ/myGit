@@ -520,7 +520,6 @@ static std::string getTheSplitPoint(const Commit& current_head, const Commit& gi
 }
 
 void Repository::merge(const std::string& branch_name) {
-    // todo
     staging_area.readFromFile();
     if (staging_area.isEmpty() == false) {
         message("You have uncommitted changes.");
